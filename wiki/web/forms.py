@@ -38,6 +38,13 @@ class EditorForm(Form):
     title = TextField('', [InputRequired()])
     body = TextAreaField('', [InputRequired()])
     tags = TextField('')
+    rating = TextField('')
+    flag = TextField('')
+
+
+class RateForm(Form):
+    rating = TextField('')
+    flag = TextField('', [InputRequired()])
 
 
 class LoginForm(Form):
@@ -55,3 +62,7 @@ class LoginForm(Form):
             return
         if not user.check_password(field.data):
             raise ValidationError('Username and password do not match.')
+
+
+class RatingForm(Form):
+    rating = TextField('')

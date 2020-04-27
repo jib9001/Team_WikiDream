@@ -14,8 +14,18 @@ Wiki Editor
 		<form method="post" class="form">
 			{{ form.hidden_tag() }}
 			{{ input(form.title, placeholder="Title", class="span7", autocomplete="off") }}
+            <!--Various check boxes to fill out the rating and flag the page if the info on it is incorrect -->
+            <!-- Had to do this in edit due to some technical difficulties-->
+            False if something is wrong on the page {{ input(form.flag, type="checkbox", value="false") }}
+            True if nothing is wrong on the page {{ input(form.flag, type="checkbox", value="true") }}
+            Select a Rating\n
+            1 {{ input(form.rating, type="checkbox", value= "1") }}
+            2 {{ input(form.rating, type="checkbox", value= "2") }}
+            3 {{ input(form.rating, type="checkbox", value= "3") }}
+            4 {{ input(form.rating, type="checkbox", value= "4") }}
+            5 {{ input(form.rating, type="checkbox", value= "5") }}
 			{{ input(form.body, placeholder="Markdown", class="span7", rows="20") }}
-			{{ input(form.tags, placeholder="Tags (comma separated)", class="span7", autocomplete="off") }}
+            {{ input(form.tags, placeholder="Tags (comma separated)", class="span7", autocomplete="off") }}
 			<div class="form-actions">
         <div class="pull-left">
           <a class="btn" href="#preview" id="previewbtn">Preview</a>
@@ -30,6 +40,8 @@ Wiki Editor
 	<div class="tab-pane" id="preview"></div>
 </div>
 {% endblock content %}
+
+
 
 {% block sidebar %}
 <h3>Editor How-To</h3>
