@@ -35,6 +35,14 @@
   <li><a href="{{ url_for('wiki.move', url=page.url) }}">Move</a></li>
   <li><a href="#confirmDelete" data-toggle="modal" class="text-error">Delete</a></li>
 </ul>
+
+<div>
+		<!-- displays the rating and flag to the page-->
+		<h3>{% block rating %}Rating: {{ page.rating }}{% endblock rating %}</h3>
+		<h3>{% block test %}Flag: {{ page.flag }}{% endblock test %}</h3>
+
+</div>
+
 {% if page.history.entries|length > 0 %}
     <h3><a href="{{ url_for('wiki.history', url=page.url) }}">History</a></h3>
 {% else %}
@@ -52,4 +60,5 @@
         <li>No Edits</li>
     {% endif %}
 </ul>
+
 {% endblock sidebar %}

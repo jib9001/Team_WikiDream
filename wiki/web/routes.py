@@ -19,6 +19,7 @@ from wiki.core import Processor
 from wiki.web import current_users
 from wiki.web import current_wiki
 from wiki.web.forms import EditorForm
+from wiki.web.forms import RatingForm
 from wiki.web.forms import LoginForm
 from wiki.web.forms import SearchForm
 from wiki.web.forms import URLForm
@@ -76,6 +77,20 @@ def edit(url):
         flash('"%s" was saved.' % page.title, 'success')
         return redirect(url_for('wiki.display', url=url))
     return render_template('editor.html', form=form, page=page)
+
+
+@bp.route('/rating/<path:url>/', methods=['GET', 'POST'])
+def rating(url):
+    page = current_wiki.get(url)
+    form = RatingForm()
+    if form.validate_on_submit():
+        if not page:
+            page = current_wiki.get_bare(url)
+        form.populate_obj(page)
+        page.save()
+        flash('"%s" was saved.' % page.title, 'success')
+        return redirect(url_for('wiki.display', url=url))
+    return render_template('page.html', form=form, page=page)
 
 
 @bp.route('/preview/', methods=['POST'])
@@ -260,4 +275,3 @@ def user_delete(user_id):
 @bp.errorhandler(404)
 def page_not_found(error):
     return render_template('404.html'), 404
-
