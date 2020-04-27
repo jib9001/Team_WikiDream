@@ -9,7 +9,10 @@ import re
 
 from flask import abort
 from flask import url_for
+
 import markdown
+import json
+import datetime
 
 
 def clean_url(url):
@@ -133,7 +136,7 @@ class Processor(object):
         # time to put them into a dictionary in the correct order
         self.meta = OrderedDict()
         rate_Num = 0
-        times_rated = 0
+        times_rated = 1
         rated = 0
         metaField = self.meta_raw.split('\n')
         for line in metaField:
@@ -172,6 +175,58 @@ class Processor(object):
             current = processor(current)
         self.final = current
 
+    def generate_contents_table(self, final):
+        """
+            Generates a table of contents for any page that uses level 1 headers
+        """
+        # Checks to see if there are any level 1 headers, after the markdown is converted
+        if final.count("<h1>"):
+            # Creates the necessary opening tags for our table of contents
+            table_html = \
+                "<div class=\"row\"><div class=\"span2\"><h3>Contents</h3><ul class='nav nav-tabs nav-stacked'>"
+
+            # gets arrays of all indicies in the file of the opening and closing h1 tags
+            header_open_loc = self.find_tags("<h1>", self.final)
+            header_close_loc = self.find_tags("</h1>", self.final)
+
+            # using the locations of the headers in the file, we can construct a table of contents
+            # after grabbing the name of a header, we add it to the table of contents as a list item
+            # we also add an anchor tag linked to the header further down on the page
+            for i in range(len(header_open_loc)):
+                header = final[header_open_loc[i] + 4:header_close_loc[i]]
+                header_f = header.lower()
+                header_f = header.replace(" ", "_")
+                header_f = "#" + header_f
+                table_html += "<li><a href=\"" + header_f + "\">" + header + "</a></li>"
+
+            # This is where we generate the anchor tags for the headers to be linked to by the table of contents
+            # It must be iterated backwards to not displace the html tags in reference to the indicies we already have
+            for i in range(len(header_open_loc)-1,-1, -1):
+                header = final[header_open_loc[i] + 4:header_close_loc[i]]
+                header_f = header.lower()
+                header_f = header.replace(" ", "_")
+                final = final[:header_open_loc[i]] + "<a name=\"" + header_f + "\"></a>" + \
+                    final[header_open_loc[i]:]
+
+            # close all of the opening tags created at the beginning of this method
+            # this completes all of the html that we need for the table of contents
+            table_html += "</ul><br></div></div>"
+
+            # add the table of contents to the final html conversion of the markdown for the page
+            final = table_html + final
+
+        return final
+
+    def find_tags(self, substr, given_string):
+        """
+            Looks for all occurrences of a substring in a given string and returns a list of the beginning index
+            of all occurrences
+        """
+        matches = re.finditer(substr, given_string)
+        matches_positions = [match.start() for match in matches]
+
+        return matches_positions
+
     def process(self):
         """
             Runs the full suite of processing on the given text, all
@@ -184,6 +239,8 @@ class Processor(object):
         self.process_meta()
         self.process_post()
 
+        self.final = self.generate_contents_table(self.final)
+
         return self.final, self.markdown, self.meta
 
 
@@ -192,6 +249,9 @@ class Page(object):
         self.path = path
         self.url = url
         self._meta = OrderedDict()
+        # Generate the path to the history file for this page and create a new history object with it
+        history_path = path.replace("\\" + url + ".md", "/history/" + url + ".json")
+        self.history = History(history_path, url)
         if not new:
             self.load()
             self.render()
@@ -207,16 +267,20 @@ class Page(object):
         processor = Processor(self.content)
         self._html, self.body, self._meta = processor.process()
 
-    def save(self, update=True):
+    def save(self, user, update=True):
         folder = os.path.dirname(self.path)
         if not os.path.exists(folder):
             os.makedirs(folder)
+
         with open(self.path, 'w', encoding='utf-8') as f:
             for key, value in list(self._meta.items()):
                 line = '%s: %s\n' % (key, value)
                 f.write(line)
             f.write('\n')
             f.write(self.body.replace('\r\n', '\n'))
+
+        self.history.save(user, self.body.replace('\r\n', '\n'))
+
         if update:
             self.load()
             self.render()
@@ -283,6 +347,49 @@ class Page(object):
         self['flag'] = value
 
 
+class History(object):
+    """
+    This History object handles all aspects of a page's history
+    """
+    def __init__(self, path, url):
+        """
+        :param path: The path to the history file.
+        :param url: The url of the page we want history for.
+        """
+        self.url = url
+        self.path = path
+        if not os.path.exists(self.path):
+            self.create()
+        with open(self.path, 'r') as hist:
+            self.entries = json.load(hist)
+            self.entryKeys = sorted(self.entries, reverse=True)
+
+    def create(self):
+        """
+        Create the history file if it doesn't already exist.
+        """
+        with open(self.path, 'w', encoding='utf-8') as hist:
+            init = "{}\n"
+            hist.write(init)
+
+    def save(self, user, version):
+        """
+        Save the new edit to the history file.
+        :param user: The user who made the edit.
+        :param version: The timestamp of when this edit was made, denoting a new version
+        :return:
+        """
+        with open(self.path, 'w') as hist:
+            self.entries[datetime.datetime.now().timestamp()] = {
+                "user": user,
+                "formatted-date": str(datetime.datetime.now().strftime('%b %d, %Y at %I:%M:%S %p')),
+                "version": version
+            }
+            hist.seek(0)
+            json.dump(self.entries, hist, indent=4)
+            hist.truncate()
+
+
 class Wiki(object):
     def __init__(self, root):
         self.root = root
@@ -336,8 +443,10 @@ class Wiki(object):
 
     def delete(self, url):
         path = self.path(url)
+        page = self.get(url)
         if not self.exists(url):
             return False
+        os.remove(page.history.path)
         os.remove(path)
         return True
 

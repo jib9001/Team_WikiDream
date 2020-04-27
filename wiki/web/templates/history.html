@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block style %}
+<style>
+    .entry {
+        transition: .3s;
+        font-size: 1.5em;
+        line-height: 1.5em;
+        padding: 5px;
+        border-bottom: 1px solid #eeeeee;
+    }
+
+    .entry:hover {
+        transition: .3s;
+        background-color: #eeeeee;
+    }
+</style>
+{% endblock style %}
+
+{% block title %}
+	{{ page.title }} History
+{% endblock title %}
+
+{% block content %}
+    {% for time in history.entryKeys %}
+        <a href="{{ url_for('wiki.history_user', url=page.url, name=history.entries[time].user, time=time) }}">
+            <div class="entry">
+                {{ history.entries[time]["user"] }} made an edit on {{ history.entries[time]["formatted-date"] }}
+            </div>
+        </a>
+    {% endfor %}
+{% endblock content %}

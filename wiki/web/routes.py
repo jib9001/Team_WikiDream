@@ -7,23 +7,28 @@ from flask import flash
 from flask import redirect
 from flask import render_template
 from flask import request
+from flask import session
 from flask import url_for
+from flask import Markup
 from flask_login import current_user
 from flask_login import login_required
 from flask_login import login_user
 from flask_login import logout_user
 
 from wiki.core import Processor
+from wiki.web import current_users
+from wiki.web import current_wiki
 from wiki.web.forms import EditorForm
 from wiki.web.forms import RatingForm
 from wiki.web.forms import LoginForm
 from wiki.web.forms import SearchForm
 from wiki.web.forms import URLForm
-from wiki.web import current_wiki
-from wiki.web import current_users
 from wiki.web.user import protect
 
+from difflib import ndiff
+
 bp = Blueprint('wiki', __name__)
+user = ''
 
 
 @bp.route('/')
@@ -68,7 +73,7 @@ def edit(url):
         if not page:
             page = current_wiki.get_bare(url)
         form.populate_obj(page)
-        page.save()
+        page.save(session["user_id"])
         flash('"%s" was saved.' % page.title, 'success')
         return redirect(url_for('wiki.display', url=url))
     return render_template('editor.html', form=form, page=page)
@@ -141,6 +146,83 @@ def search():
         return render_template('search.html', form=form,
                                results=results, search=form.term.data)
     return render_template('search.html', form=form, search=None)
+
+
+@bp.route('/history/<path:url>/')
+@protect
+def history(url):
+    """
+    This route handles showing the pages history.
+    :param url: The url of the page for which you want the history of
+    :return: Show the history of the page
+    """
+    page = current_wiki.get_or_404(url)
+    return render_template('history.html', history=page.history, page=page)
+
+
+@bp.route('/history/<path:url>/<string:name>')
+@protect
+def history_user(url, name):
+    """
+    This route handles displaying the additions and subtractions to the page that a user made.
+    :param url: The url of the page that was edited
+    :param name: The name of the user who edited the page
+    :return: Show a page the highlights the differences between the current content and the previous content
+    """
+    # get the page passed
+    page = current_wiki.get_or_404(url)
+
+    # The timestamp of the edit is passed as a query param
+    # Use it to get the edit we're interested in
+    current_entry = page.history.entries[request.args.get("time")]
+    previous_entry = current_entry
+    current_entry_idx = page.history.entryKeys.index(request.args.get("time"))
+
+    # Get the most recent edit made before the current one
+    if current_entry_idx + 1 < len(page.history.entryKeys):
+        previous_entry_idx = current_entry_idx + 1
+        previous_entry_key = page.history.entryKeys[previous_entry_idx]
+        previous_entry = page.history.entries[previous_entry_key]
+
+    # Generate a difference highlighting the additions and subtractions from the content
+    diff = ndiff(previous_entry["version"], current_entry["version"])
+    adding = False
+    first_add = True
+    subtracting = False
+    first_subtract = True
+    diff_length = len(list(diff))
+    edits = ""
+    for i, s in enumerate(ndiff(previous_entry["version"], current_entry["version"])):
+
+        if (s[0] != '+' or i + 1 == diff_length) and adding is True:
+            adding = False
+            first_add = True
+            edits += "</span>"
+
+        if (s[0] != '-' or i + 1 == diff_length) and subtracting is True:
+            subtracting = False
+            first_subtract = True
+            edits += "</span>"
+
+        if s[0] == '+':
+            if first_add is True:
+                edits += "<span class=addition>"
+                first_add = False
+            adding = True
+            edits += s[2]
+
+        if s[0] == '-':
+            if first_subtract is True:
+                edits += "<span class=subtraction>"
+                first_subtract = False
+            subtracting = True
+            edits += s[2]
+
+        if s[0] == ' ':
+            edits += s[2]
+
+    safe_edits = Markup(edits)
+    return render_template('user_based_history.html', edits=safe_edits, page=page, user=name, time=request.args.get("time"))
 
 
 @bp.route('/user/login/', methods=['GET', 'POST'])
