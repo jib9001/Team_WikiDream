@@ -115,7 +115,6 @@ class Processor(object):
         """
         self.html = self.md.convert(self.pre)
 
-
     def split_raw(self):
         """
             Split text into raw meta and content.
@@ -133,12 +132,36 @@ class Processor(object):
         # entries, so we have to loop over the meta values a second
         # time to put them into a dictionary in the correct order
         self.meta = OrderedDict()
-        for line in self.meta_raw.split('\n'):
+        rate_Num = 0
+        times_rated = 0
+        rated = 0
+        metaField = self.meta_raw.split('\n')
+        for line in metaField:
             key = line.split(':', 1)[0]
+            rate = line.split()
+            if key == 'total':
+                rate_Num = int(rate[1])
+            elif key == 'timesrated':
+                times_rated = int(rate[1]) + 1
+            elif key == 'rating':
+                rated = int(rate[1])
+
+        total = rated + rate_Num
+        rated = str(total / times_rated)
+
+        for line in metaField:
+            key = line.split(':', 1)[0]
+            if key == 'total':
+                self.md.Meta[key.lower()] = str(total).lower()
+            elif key == 'timesrated':
+                self.md.Meta[key.lower()] = str(times_rated).lower()
+            elif key == 'rating':
+                self.md.Meta[key.lower()] = str(rated).lower()
+
+
             # markdown metadata always returns a list of lines, we will
             # reverse that here
-            self.meta[key.lower()] = \
-                '\n'.join(self.md.Meta[key.lower()])
+            self.meta[key.lower()] = '\n'.join(self.md.Meta[key.lower()])
 
     def process_post(self):
         """
@@ -237,6 +260,28 @@ class Page(object):
     def tags(self, value):
         self['tags'] = value
 
+    @property
+    def rating(self):
+        try:
+            return self['rating']
+        except KeyError:
+            return 0
+
+    @rating.setter
+    def rating(self, value):
+        self['rating'] = value
+
+    @property
+    def flag(self):
+        try:
+            return self['flag']
+        except KeyError:
+            return 0
+
+    @flag.setter
+    def flag(self, value):
+        self['flag'] = value
+
 
 class Wiki(object):
     def __init__(self, root):
@@ -251,7 +296,7 @@ class Wiki(object):
 
     def get(self, url):
         path = self.path(url)
-        #path = os.path.join(self.root, url + '.md')
+        # path = os.path.join(self.root, url + '.md')
         if self.exists(url):
             return Page(path, url)
         return None
@@ -309,7 +354,7 @@ class Wiki(object):
         root = os.path.abspath(self.root)
         for cur_dir, _, files in os.walk(root):
             # get the url of the current directory
-            cur_dir_url = cur_dir[len(root)+1:]
+            cur_dir_url = cur_dir[len(root) + 1:]
             for cur_file in files:
                 path = os.path.join(cur_dir, cur_file)
                 if cur_file.endswith('.md'):
