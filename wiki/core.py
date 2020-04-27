@@ -136,7 +136,7 @@ class Processor(object):
         # time to put them into a dictionary in the correct order
         self.meta = OrderedDict()
         rate_Num = 0
-        times_rated = 0
+        times_rated = 1
         rated = 0
         metaField = self.meta_raw.split('\n')
         for line in metaField:
