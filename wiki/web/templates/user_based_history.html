@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block style %}
+<style>
+    .addition {
+        background-color: #54bf48;
+        border-radius: 3px;
+    }
+
+    .subtraction {
+        background-color: rgba(191,0,9,0.64);
+        border-radius: 3px;
+    }
+
+    .version {
+        padding: 10px;
+    }
+
+    .version:first-child {
+        border-top-left-radius: 5px;
+        border-top-right-radius: 5px;
+        border: 1px solid #eeeeee
+    }
+
+    .version:last-child {
+        border-bottom-left-radius: 5px;
+        border-bottom-right-radius: 5px;
+        border: 1px solid #eeeeee;
+        border-top: 0px;
+    }
+</style>
+{% endblock style %}
+
+{% block title %}
+    {{ user }}
+{% endblock title %}
+
+{% block content %}
+    <div class="version">
+        {{ edits }}
+    </div>
+    <div class="version">
+        {{ page.history.entries[time]["version"] }}
+    </div>
+
+{% endblock content %}

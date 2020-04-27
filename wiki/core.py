@@ -9,7 +9,10 @@ import re
 
 from flask import abort
 from flask import url_for
+
 import markdown
+import json
+import datetime
 
 
 def clean_url(url):
@@ -114,7 +117,6 @@ class Processor(object):
             Convert to HTML.
         """
         self.html = self.md.convert(self.pre)
-
 
     def split_raw(self):
         """
@@ -223,6 +225,9 @@ class Page(object):
         self.path = path
         self.url = url
         self._meta = OrderedDict()
+        # Generate the path to the history file for this page and create a new history object with it
+        history_path = path.replace("\\" + url + ".md", "/history/" + url + ".json")
+        self.history = History(history_path, url)
         if not new:
             self.load()
             self.render()
@@ -238,16 +243,20 @@ class Page(object):
         processor = Processor(self.content)
         self._html, self.body, self._meta = processor.process()
 
-    def save(self, update=True):
+    def save(self, user, update=True):
         folder = os.path.dirname(self.path)
         if not os.path.exists(folder):
             os.makedirs(folder)
+
         with open(self.path, 'w', encoding='utf-8') as f:
             for key, value in list(self._meta.items()):
                 line = '%s: %s\n' % (key, value)
                 f.write(line)
             f.write('\n')
             f.write(self.body.replace('\r\n', '\n'))
+
+        self.history.save(user, self.body.replace('\r\n', '\n'))
+
         if update:
             self.load()
             self.render()
@@ -292,6 +301,49 @@ class Page(object):
         self['tags'] = value
 
 
+class History(object):
+    """
+    This History object handles all aspects of a page's history
+    """
+    def __init__(self, path, url):
+        """
+        :param path: The path to the history file.
+        :param url: The url of the page we want history for.
+        """
+        self.url = url
+        self.path = path
+        if not os.path.exists(self.path):
+            self.create()
+        with open(self.path, 'r') as hist:
+            self.entries = json.load(hist)
+            self.entryKeys = sorted(self.entries, reverse=True)
+
+    def create(self):
+        """
+        Create the history file if it doesn't already exist.
+        """
+        with open(self.path, 'w', encoding='utf-8') as hist:
+            init = "{}\n"
+            hist.write(init)
+
+    def save(self, user, version):
+        """
+        Save the new edit to the history file.
+        :param user: The user who made the edit.
+        :param version: The timestamp of when this edit was made, denoting a new version
+        :return:
+        """
+        with open(self.path, 'w') as hist:
+            self.entries[datetime.datetime.now().timestamp()] = {
+                "user": user,
+                "formatted-date": str(datetime.datetime.now().strftime('%b %d, %Y at %I:%M:%S %p')),
+                "version": version
+            }
+            hist.seek(0)
+            json.dump(self.entries, hist, indent=4)
+            hist.truncate()
+
+
 class Wiki(object):
     def __init__(self, root):
         self.root = root
@@ -305,7 +357,7 @@ class Wiki(object):
 
     def get(self, url):
         path = self.path(url)
-        #path = os.path.join(self.root, url + '.md')
+        # path = os.path.join(self.root, url + '.md')
         if self.exists(url):
             return Page(path, url)
         return None
@@ -345,8 +397,10 @@ class Wiki(object):
 
     def delete(self, url):
         path = self.path(url)
+        page = self.get(url)
         if not self.exists(url):
             return False
+        os.remove(page.history.path)
         os.remove(path)
         return True
 
@@ -363,7 +417,7 @@ class Wiki(object):
         root = os.path.abspath(self.root)
         for cur_dir, _, files in os.walk(root):
             # get the url of the current directory
-            cur_dir_url = cur_dir[len(root)+1:]
+            cur_dir_url = cur_dir[len(root) + 1:]
             for cur_file in files:
                 path = os.path.join(cur_dir, cur_file)
                 if cur_file.endswith('.md'):

@@ -31,8 +31,25 @@
 {% endif %}
 <h3>Actions</h3>
 <ul class="nav nav-tabs nav-stacked">
-	<li><a href="{{ url_for('wiki.edit', url=page.url) }}">Edit</a></li>
+  <li><a href="{{ url_for('wiki.edit', url=page.url) }}">Edit</a></li>
   <li><a href="{{ url_for('wiki.move', url=page.url) }}">Move</a></li>
   <li><a href="#confirmDelete" data-toggle="modal" class="text-error">Delete</a></li>
+</ul>
+{% if page.history.entries|length > 0 %}
+    <h3><a href="{{ url_for('wiki.history', url=page.url) }}">History</a></h3>
+{% else %}
+    <h3>History</h3>
+{% endif %}
+<ul class="nav nav-tabs nav-stacked">
+    {% if page.history.entries|length > 0 %}
+        {% for time in page.history.entryKeys %}
+            {% set entry = page.history.entries[time] %}
+            {% if loop.index < 4 %}
+                <li><a href="{{ url_for('wiki.history_user', url=page.url, name=entry.user, time=time) }}">Edited by {{ entry.user }}</a></li>
+            {% endif %}
+        {% endfor %}
+    {% else %}
+        <li>No Edits</li>
+    {% endif %}
 </ul>
 {% endblock sidebar %}
